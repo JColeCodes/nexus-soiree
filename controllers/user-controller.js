@@ -18,11 +18,11 @@ const userController = {
         User.findOne({ _id: req.params.id })
             .populate({
                 path: 'thoughts',
-                select: '-__v'
+                select: '-__v -username'
             })
             .populate({
                 path: 'friends',
-                select: '-__v'
+                select: '-thoughts -friends -friendCount -__v'
             })
             .select('-__v')
             .then(userData => {

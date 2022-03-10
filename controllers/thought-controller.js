@@ -16,10 +16,6 @@ const thoughtController = {
     // Get thought by id
     getThoughtById(req, res) {
         Thought.findOne({ _id: req.params.id })
-            .populate({
-                path: 'reactions',
-                select: '-_id -__v'
-            })
             .select('-__v')
             .then(thoughtData => {
                 if (!thoughtData) {
@@ -43,7 +39,7 @@ const thoughtController = {
                 return User.findOneAndUpdate(
                     { username: req.body.username },
                     { $push: { thoughts: _id } },
-                    { new: true }
+                    { new: true, runValidators: true }
                 );
             })
             .then(userData => {
@@ -85,7 +81,7 @@ const thoughtController = {
                 return User.findOneAndUpdate(
                     { username: deletedThought.username },
                     { $pull: { thoughts: req.params.id } },
-                    { new: true, runValidators: true }
+                    { new: true }
                 );
             })
             .then(userData => {
