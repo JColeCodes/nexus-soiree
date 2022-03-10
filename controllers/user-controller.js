@@ -1,4 +1,4 @@
-const { User } = require('../models');
+const { User, Thought } = require('../models');
 
 const userController = {
     // Get all users
@@ -28,7 +28,7 @@ const userController = {
             .then(userData => {
                 if (!userData) {
                     res.status(404).json({ message: 'Could not find user with this id' });
-                    return
+                    return;
                 }
                 res.json(userData);
             })
@@ -50,11 +50,26 @@ const userController = {
 
     // Update user
     updateUser(req, res) {
-        User.findOneAndUpdate({ _id: req.params.id }, req.body, { new: true, runValidators: true })
+        let oldUsername;
+        User.findOne({ _id: req.params.id })
+            .then(userData => oldUsername = userData.username)
+            .catch(err => {
+                console.log(err);
+                res.status(500).json(err);
+            });
+        User.findOneAndUpdate(
+            { _id: req.params.id }, req.body, { new: true, runValidators: true })
+            .then((body) => {
+                return Thought.updateMany(
+                    { username: oldUsername },
+                    { username: body.username },
+                    { new: true, runValidators: true }
+                );
+            })
             .then(userData => {
                 if (!userData) {
                     res.status(404).json({ message: 'Could not find user with this id' });
-                    return
+                    return;
                 }
                 res.json(userData);
             })
@@ -67,10 +82,75 @@ const userController = {
     // Delete user
     deleteUser(req, res) {
         User.findOneAndDelete({ _id: req.params.id })
+            .then(({ username }) => {
+                return Thought.deleteMany({ username: username });
+            })
+            .then(() => {
+                return User.updateMany(
+                    { friends: { _id: req.params.id } },
+                    { $pull: { friends: req.params.id } },
+                    { new: true, runValidators: true }
+                );
+            })
             .then(userData => {
                 if (!userData) {
                     res.status(404).json({ message: 'Could not find user with this id' });
-                    return
+                    return;
+                }
+                res.json(userData);
+            })
+            .catch(err => {
+                console.log(err);
+                res.status(500).json(err);
+            });
+    },
+
+    // FRIENDS
+    // Add friend
+    addFriend(req, res) {
+        User.findOneAndUpdate(
+            { _id: req.params.userId },
+            { $push: { friends: req.params.friendId } },
+            { new: true, runValidators: true }
+        )
+            .then(() => {
+                return User.findOneAndUpdate(
+                    { _id: req.params.friendId },
+                    { $push: { friends: req.params.userId } },
+                    { new: true, runValidators: true }
+                );
+            })
+            .then(userData => {
+                if (!userData) {
+                    res.status(404).json({ message: 'Could not find user with this id' });
+                    return;
+                }
+                res.json(userData);
+            })
+            .catch(err => {
+                console.log(err);
+                res.status(500).json(err);
+            });
+    },
+
+    // Remove friend
+    removeFriend(req, res) {
+        User.findOneAndUpdate(
+            { _id: req.params.userId },
+            { $pull: { friends: req.params.friendId } },
+            { new: true, runValidators: true }
+        )
+            .then(() => {
+                return User.findOneAndUpdate(
+                    { _id: req.params.friendId },
+                    { $pull: { friends: req.params.userId } },
+                    { new: true, runValidators: true }
+                );
+            })
+            .then(userData => {
+                if (!userData) {
+                    res.status(404).json({ message: 'Could not find user with this id' });
+                    return;
                 }
                 res.json(userData);
             })

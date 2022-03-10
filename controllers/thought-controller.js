@@ -16,6 +16,10 @@ const thoughtController = {
     // Get thought by id
     getThoughtById(req, res) {
         Thought.findOne({ _id: req.params.id })
+            .populate({
+                path: 'reactions',
+                select: '-_id -__v'
+            })
             .select('-__v')
             .then(thoughtData => {
                 if (!thoughtData) {
@@ -32,10 +36,12 @@ const thoughtController = {
 
     // Add thought
     addThought(req, res) {
+        let thoughtId;
         Thought.create(req.body)
             .then(({ _id }) => {
+                thoughtId = _id;
                 return User.findOneAndUpdate(
-                    { _id: req.body.userId },
+                    { username: req.body.username },
                     { $push: { thoughts: _id } },
                     { new: true }
                 );
@@ -43,7 +49,7 @@ const thoughtController = {
             .then(userData => {
                 if (!userData) {
                     res.status(404).json({ message: 'Could not find user with this username' });
-                    return
+                    return Thought.findOneAndDelete({ _id: thoughtId });
                 }
                 res.json(userData);
             })
@@ -74,22 +80,68 @@ const thoughtController = {
         Thought.findOneAndDelete({ _id: req.params.id })
             .then(deletedThought => {
                 if (!deletedThought) {
-                    res.status(404).json({ message: 'Could not find thought with this id' });
-                    return
+                    return res.status(404).json({ message: 'Could not find thought with this id' });
                 }
                 return User.findOneAndUpdate(
-                    { username: req.body.username },
+                    { username: deletedThought.username },
                     { $pull: { thoughts: req.params.id } },
-                    { new: true }
+                    { new: true, runValidators: true }
                 );
             })
             .then(userData => {
+                console.log(userData);
                 if (!userData) {
                     res.status(404).json({ message: 'Could not find user with this username' });
-                    return
+                    return;
                 }
                 res.json(userData);
             })
+            .catch(err => {
+                console.log(err);
+                res.json(err);
+            });
+    },
+
+    // REACTIONS
+    // Add reaction
+    addReaction(req, res) {
+        User.findOne({ username: req.body.username })
+            .then(userData => {
+                if (userData) {
+                    Thought.findOneAndUpdate(
+                        { _id: req.params.thoughtId },
+                        { $push: { reactions: req.body } },
+                        { new: true, runValidators: true }
+                    )
+                        .then(thoughtData => {
+                            if (!thoughtData) {
+                                res.status(404).json({ message: 'Could not find thought with this id' });
+                            }
+                            res.json(thoughtData);
+                        })
+                        .catch(err => {
+                            console.log(err);
+                            res.json(err);
+                        });
+                }
+                else {
+                    res.status(404).json({ message: 'Could not find user with this username' });
+                }
+            })
+            .catch(err => {
+                console.log(err);
+                res.json(err);
+            });
+    },
+
+    // Remove reaction
+    removeReaction(req, res) {
+        Thought.findOneAndUpdate(
+            { _id: req.params.thoughtId },
+            { $pull: { reactions: { reactionId: req.body.reactionId } } },
+            { new: true }
+        )
+            .then(thoughtData => res.json(thoughtData))
             .catch(err => {
                 console.log(err);
                 res.json(err);
